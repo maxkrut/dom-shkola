@@ -1,0 +1,36 @@
+# Only the public website belongs in this repository.
+# Data preparation, source documents, caches and local artifacts stay local.
+/*
+!/.github/
+!/.gitattributes
+!/.gitignore
+!/README.md
+!/README.en.md
+!/CHANGELOG.md
+!/LICENSE
+!/THIRD_PARTY_NOTICES.md
+!/app/
+!/assets/
+!/site-data/
+!/tests/
+!/web-tools/
+
+/.github/*
+!/.github/workflows/
+/.github/workflows/*
+!/.github/workflows/pages.yml
+
+/app/*
+!/app/static/
+/app/static/school-view-wire.mjs
+/app/static/source-previews/
+/app/static/vendor/**/*.map
+
+**/__pycache__/
+**/*.py[cod]
+**/.DS_Store
+**/Thumbs.db
+**/.env
+**/.env.*
+**/*.tmp
+**/*.log

@@ -1,0 +1,7 @@
+# The viewer checks hashes of its delivered bytes. Preserve them across systems.
+* text=auto
+app/static/** -text
+site-data/** -text
+assets/** -text
+# Preserve third-party vendor files exactly as distributed.
+app/static/vendor/** -whitespace

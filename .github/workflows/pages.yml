@@ -1,0 +1,50 @@
+name: Website
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Test website interactions
+        run: node --throw-deprecation --test tests/*.mjs tests/*.cjs
+      - name: Test website assembly
+        run: python -W error -m unittest discover -s web-tools -p 'test_*.py'
+      - name: Verify and assemble website
+        run: python -W error web-tools/assemble_site.py --output "$RUNNER_TEMP/dom-shkola-site" --built-at "$(git log -1 --format=%cI)"
+      - uses: actions/configure-pages@v6
+        if: github.event_name != 'pull_request' && github.event.repository.private == false
+      - uses: actions/upload-pages-artifact@v5
+        if: github.event_name != 'pull_request' && github.event.repository.private == false
+        with:
+          path: ${{ runner.temp }}/dom-shkola-site
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.event.repository.private == false
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
