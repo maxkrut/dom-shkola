@@ -123,12 +123,27 @@ export class StaticSourceEvidence {
       canvas.dataset.fit = String(zoom === 'fit');
       canvas.innerHTML = `<div class="source-zoom-surface" style="width:${sourceZoomWidth(crop, plan.display_rotation || 0, zoom)}">${svg(plan, image, crop, `Страница ${plan.page.number}: ${spec.label || schoolLabel(spec.school)}`, marks)}</div>`;
       dialog.querySelector('[data-source-zoom]').value = String(zoom);
-      canvas.scrollTop = 0;
-      const focus = plan.address?.at(-1) || plan.school, surface = canvas.querySelector('.source-zoom-surface');
+      const focus = plan.address?.at(-1) || plan.school;
+      const focusBox = focus || (view === 'fragment' && plan.crop
+        ? [plan.crop[0], plan.crop[1], plan.crop[0] + plan.crop[2], plan.crop[1] + plan.crop[3]]
+        : null);
+      const surface = canvas.querySelector('.source-zoom-surface');
       dialog.querySelector('.source-pan-hint').hidden = surface.clientWidth <= canvas.clientWidth;
-      canvas.scrollLeft = view === 'fragment' && plan.exact && focus ? Math.max(0,
-        sourceViewPoint([(focus[0] + focus[2]) / 2, (focus[1] + focus[3]) / 2], crop, plan.display_rotation || 0)[0]
-        * surface.clientWidth / sourceViewGeometry(crop, plan.display_rotation || 0).viewBox[2] - canvas.clientWidth / 2) : 0;
+      canvas.scrollTop = 0;
+      canvas.scrollLeft = 0;
+      if (view === 'fragment' && focusBox) {
+        const focusPoint = sourceViewPoint(
+          [(focusBox[0] + focusBox[2]) / 2, (focusBox[1] + focusBox[3]) / 2],
+          crop, plan.display_rotation || 0
+        );
+        const viewBox = sourceViewGeometry(crop, plan.display_rotation || 0).viewBox;
+        const scaleX = surface.clientWidth / viewBox[2];
+        const scaleY = surface.clientHeight / viewBox[3];
+        if (plan.exact || spec.rule) {
+          canvas.scrollLeft = Math.max(0, focusPoint[0] * scaleX - canvas.clientWidth / 2);
+        }
+        canvas.scrollTop = Math.max(0, focusPoint[1] * scaleY - canvas.clientHeight / 3);
+      }
     };
     const load = async () => {
       const requested = zoom > 1 ? 'detail' : 'preview';

@@ -11,4 +11,4 @@ Find the schools assigned to an address, or search for a school by name or numbe
 
 Assignments and document excerpts come from official district sources.
 
-[Open the map](https://maxkrut.github.io/dom-shkola/) · [Report an error](https://github.com/maxkrut/dom-shkola/issues/new) · [Licences and sources](THIRD_PARTY_NOTICES.md) · [v1.0.0](CHANGELOG.md)
+[Open the map](https://maxkrut.github.io/dom-shkola/) · [Report an error](https://github.com/maxkrut/dom-shkola/issues/new) · [Licences and sources](THIRD_PARTY_NOTICES.md) · [v1.0.1](CHANGELOG.md)

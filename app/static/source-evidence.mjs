@@ -26,7 +26,21 @@ export function bindInlineSourceFragment(host, label) {
     button.setAttribute('aria-expanded', String(expanded));
     button.setAttribute('aria-label', `${action}: ${label}`);
     button.title = action;
-    if (!expanded) { viewport.scrollLeft = 0; viewport.scrollTop = 0; }
+    if (!expanded) {
+      viewport.scrollLeft = 0;
+      viewport.scrollTop = 0;
+    } else {
+      const schedule = globalThis.requestAnimationFrame ?? ((fn) => setTimeout(fn, 0));
+      schedule(() => {
+        const mark = viewport.querySelector(".address-mark, .evidence-mark");
+        const target = mark || viewport.querySelector("svg");
+        if (!target) return;
+        const targetRect = target.getBoundingClientRect();
+        const viewRect = viewport.getBoundingClientRect();
+        viewport.scrollTop += targetRect.top - viewRect.top - viewRect.height / 3;
+        viewport.scrollLeft += targetRect.left - viewRect.left - viewRect.width / 2;
+      });
+    }
   }
   button.addEventListener('click', () => setExpanded(!expanded));
   return (image, nextLabel) => {
@@ -223,7 +237,7 @@ class SourceEvidence extends (globalThis.HTMLElement || class {}) {
         this.region = region;
         if (globalThis.window.schoolViewerApi.isStaticDelivery) {
           this.plan = bindSourceDisplay(plan, {...spec, sha256:region.sha256});
-          const { StaticSourceEvidence } = await import('./static-source-evidence.mjs?v=20261106-rule-scope');
+          const { StaticSourceEvidence } = await import('./static-source-evidence.mjs?v=20261111-fragment-scroll');
           if (!this.isConnected || ticket !== this.ticket) return;
           this.staticView = new StaticSourceEvidence(this, spec, this.plan,
             { svg, escape, localPdfHref, originalDocumentLink, schoolLabel, sourceViewPoint, sourceViewGeometry, sourceZoomWidth,
@@ -307,13 +321,27 @@ class SourceEvidence extends (globalThis.HTMLElement || class {}) {
       const image = this.region ? this.imageUrl(view === "page" ? "page" : "address") : this.image;
       canvas.innerHTML = `<div class="source-zoom-surface" style="width:${sourceZoomWidth(crop,plan.display_rotation || 0,zoom)}">${svg(plan,image,crop,`Страница ${plan.page.number}: ${spec.label || schoolLabel(spec.school)}`,showMarks,this.region ? crop : null)}</div>`;
       dialog.querySelector('[data-source-zoom]').value = String(zoom);
-      canvas.scrollTop = 0;
-      const focus = plan.address.at(-1) || plan.school;
+      const focus = plan.address?.at(-1) || plan.school;
+      const focusBox = focus || (view === "fragment" && plan.crop
+        ? [plan.crop[0], plan.crop[1], plan.crop[0] + plan.crop[2], plan.crop[1] + plan.crop[3]]
+        : null);
       const surface = canvas.querySelector(".source-zoom-surface");
       dialog.querySelector('.source-pan-hint').hidden = surface.clientWidth <= canvas.clientWidth;
-      canvas.scrollLeft = view === "fragment" && plan.exact && focus
-        ? Math.max(0, sourceViewPoint([(focus[0]+focus[2])/2,(focus[1]+focus[3])/2],crop,plan.display_rotation || 0)[0]
-          *surface.clientWidth/sourceViewGeometry(crop,plan.display_rotation || 0).viewBox[2]-canvas.clientWidth/2) : 0;
+      canvas.scrollTop = 0;
+      canvas.scrollLeft = 0;
+      if (view === "fragment" && focusBox) {
+        const focusPoint = sourceViewPoint(
+          [(focusBox[0] + focusBox[2]) / 2, (focusBox[1] + focusBox[3]) / 2],
+          crop, plan.display_rotation || 0
+        );
+        const viewBox = sourceViewGeometry(crop, plan.display_rotation || 0).viewBox;
+        const scaleX = surface.clientWidth / viewBox[2];
+        const scaleY = surface.clientHeight / viewBox[3];
+        if (plan.exact || spec.rule) {
+          canvas.scrollLeft = Math.max(0, focusPoint[0] * scaleX - canvas.clientWidth / 2);
+        }
+        canvas.scrollTop = Math.max(0, focusPoint[1] * scaleY - canvas.clientHeight / 3);
+      }
       dialog.querySelectorAll("[data-modal-view]").forEach(button=>button.setAttribute("aria-pressed",String(button.dataset.modalView===view)));
     };
     dialog.querySelector("[data-close-source]").addEventListener("click",()=>dialog.close());

@@ -77,6 +77,11 @@ export function installAnnotations() {
 
 // One document renderer for the sidebar and address information. Only the
 // selected fragment is loaded, and only after the user opens it.
+function gardenBoundaryButtonLabel(territoryId) {
+  const feature = window.schoolMapState?.gardenById?.get?.(territoryId);
+  return feature?.properties?.status === 'source_only_unlocated' ? 'Информация о СНТ' : 'Показать границу СНТ';
+}
+
 function documentViewer(info, {inline = false, id = 'source-choice'} = {}) {
   const section = document.createElement('section'); section.className = 'inline-documents';
   const documents = info?.documents || [];
@@ -90,6 +95,11 @@ function documentViewer(info, {inline = false, id = 'source-choice'} = {}) {
   for (const [index, doc] of documents.entries()) {
     const option = document.createElement('option'); option.value = index; option.textContent = doc.label;
     choice.append(option);
+  }
+  if (documents.length === 1) {
+    choice.hidden = true;
+    label.hidden = true;
+    line.classList.add('document-choice-line--single');
   }
   line.append(label, choice);
   const action = document.createElement('button'); action.type = 'button';
@@ -476,8 +486,9 @@ export function installCompactShell() {
     const groups = document.createElement('div');
     directory.append(groups);
     renderStreetPages(directory, model.streets, street => {
-      const group = document.createElement('section'); group.className = 'street-group';
-      const title = document.createElement('h3'); title.className = 'street-group-title';
+      const group = document.createElement('section');
+      group.className = street.kind === 'garden' ? 'street-group street-group--garden' : 'street-group';
+      const title = document.createElement('button'); title.type = 'button'; title.className = 'street-group-title';
       const name = document.createElement('span'); name.textContent = street.name;
       const count = document.createElement('span'); count.className = 'street-house-count';
       const total = street.items.length;
@@ -488,7 +499,26 @@ export function installCompactShell() {
         count.textContent = `${total} ${houseCountForms[houseCountPlural.select(total)]}`;
       }
       title.append(name, count);
+      title.setAttribute('aria-expanded', 'true');
+      title.setAttribute('aria-controls', '');
       const rows = document.createElement('div'); rows.className = 'street-houses';
+      // SNT rows are a single territory action, not a long house list — keep them visible.
+      const collapseByDefault = street.kind !== 'garden' && (model.streets.length > 8 || total > 6);
+      if (collapseByDefault) {
+        rows.hidden = true;
+        title.setAttribute('aria-expanded', 'false');
+      }
+      if (street.kind === 'garden') {
+        title.setAttribute('title', 'Территория СНТ: ниже информация и переход к карточке');
+      }
+      const groupId = `street-group-${street.name.replace(/\s+/g, '-').slice(0, 40)}-${Math.random().toString(36).slice(2, 7)}`;
+      rows.id = groupId;
+      title.setAttribute('aria-controls', groupId);
+      title.addEventListener('click', () => {
+        const open = rows.hidden;
+        rows.hidden = !open;
+        title.setAttribute('aria-expanded', String(open));
+      });
       group.append(title);
       if (showSchools && street.locality) {
         const locality = document.createElement('p'); locality.className = 'street-list-locality';
@@ -496,7 +526,7 @@ export function installCompactShell() {
         group.append(locality);
       }
       if(street.kind==='garden') {
-        const boundary=document.createElement('button'); boundary.type='button';boundary.className='street-garden-map';boundary.textContent='Показать границу СНТ';
+        const boundary=document.createElement('button'); boundary.type='button';boundary.className='street-garden-map';boundary.textContent=gardenBoundaryButtonLabel(street.territoryId);
         boundary.addEventListener('click',()=>window.schoolCardActions?.selectGarden(street.territoryId)); rows.append(boundary);
         const note=document.createElement('p');note.className='shared-area-hint';
         const schools = showSchools ? namesFor(street.members) : (street.schoolNumbers || []).join(', ');
@@ -547,6 +577,7 @@ export function installCompactShell() {
       if (mapToggle) {
         mapToggle.setAttribute('aria-pressed', 'false');
         mapToggle.textContent = 'Карта';
+        mapToggle.setAttribute('aria-label', 'Показывать карту');
       }
     }
   };

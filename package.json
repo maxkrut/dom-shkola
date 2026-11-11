@@ -1,0 +1,21 @@
+{
+  "name": "dom-shkola",
+  "version": "1.0.1",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "scripts": {
+    "sync:maplibre": "node scripts/sync_maplibre_vendor.mjs",
+    "sync:licenses": "node scripts/sync_license_notices.mjs",
+    "test:viewer": "node scripts/smoke_sidebar_render.js",
+    "test:browser": "node scripts/test_browser_smoke.cjs",
+    "test:map-tiles": "node --test scripts/test_school_area_tiles.mjs scripts/test_school_area_tiles_viewer.cjs scripts/test_school_capsule_pool.cjs scripts/test_viewer_memory_probe.cjs",
+    "test:static-register": "node --test scripts/test_register_search_core.mjs scripts/test_static_json_reader.mjs scripts/test_register_search_engine.mjs scripts/test_register_search_client.mjs scripts/test_register_column_codec.mjs scripts/test_register_details.mjs",
+    "test:static-pages": "node --test scripts/test_document_page_pool.mjs scripts/test_document_pages.mjs scripts/test_static_source_evidence.mjs"
+  },
+  "dependencies": {
+    "maplibre-gl": "6.0.0"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}

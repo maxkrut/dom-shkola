@@ -11,4 +11,4 @@
 
 Сведения о закреплении и фрагменты документов взяты из официальных районных источников.
 
-[Открыть карту](https://maxkrut.github.io/dom-shkola/) · [Сообщить об ошибке](https://github.com/maxkrut/dom-shkola/issues/new) · [Лицензии и источники](THIRD_PARTY_NOTICES.md) · [v1.0.0](CHANGELOG.md)
+[Открыть карту](https://maxkrut.github.io/dom-shkola/) · [Сообщить об ошибке](https://github.com/maxkrut/dom-shkola/issues/new) · [Лицензии и источники](THIRD_PARTY_NOTICES.md) · [v1.0.1](CHANGELOG.md)

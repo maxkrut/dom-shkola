@@ -2325,14 +2325,16 @@ class SchoolCapsules {
     if (!width || !height) return;
     const seen = new Set();
     const focused = hasMapSelection();
-    const scale = Math.min(1, Math.max(0.36, 0.36 + (this.map.getZoom() - 9) * 0.107));
+    const zoom = this.map.getZoom();
+    const sparseBadges = zoom < 10.4 && !focused;
+    const scale = Math.min(1, Math.max(0.36, 0.36 + (zoom - 9) * 0.107));
     if (this.scale !== scale) {
       this.root.style.setProperty("--capsule-scale", String(scale));
       this.scale = scale;
     }
     for (const feature of this.features) {
       const key = feature.properties.school_key;
-      if (seen.has(key) || (focused && !this.active.has(key))) continue;
+      if (seen.has(key) || (focused && !this.active.has(key)) || (sparseBadges && !this.active.has(key))) continue;
       const point = this.map.project(feature.geometry.coordinates);
       if (point.x < 0 || point.x > width || point.y < 0 || point.y > height) continue;
       seen.add(key);
@@ -2412,11 +2414,11 @@ class SharedAreaCounters extends SchoolCapsules {
       const count = item.members.length;
       return { type: 'Feature', geometry: { type: 'Point', coordinates: [point.lng, point.lat] }, properties: {
         school_key: item.key, district: item.properties.district,
-        school_number: `${count} ${ruPlural(count, 'школа', 'школы', 'школ')}`,
-        canonical_school_name: `Общая территория: ${count} ${ruPlural(count, 'школа', 'школы', 'школ')}. ${item.members.map(key => {
+        school_number: `∩${count}`,
+        canonical_school_name: `Пересечение расчётных областей ${count} ${ruPlural(count, 'школы', 'школ', 'школ')}: ${item.members.map(key => {
           const school = state.schoolByKey.get(key);
           return school ? compactSchoolTitle(school) : key.split('::').slice(1).join('::');
-        }).join(', ')}. Показать список`
+        }).join(', ')}. Закрепление каждого дома — в таблице`
       } };
     }), new Set(selectedSharedArea() ? [selectedSharedArea().key] : []));
   }
@@ -2649,7 +2651,7 @@ function renderSchoolSections() {
 function syncSchoolAreaFeatureStates(force = false) {
   if (state.schoolAreaTiles) {
     const scope = selectedSharedArea();
-    const hideTiles = state.selectedAddressId || state.selectedGardenId;
+    const hideTiles = Boolean(state.selectedGardenId);
     state.schoolAreaTiles.select(hideTiles ? new Set() : activeSchoolKeysForSelection(), {
       focusOnly: hasMapSelection(),
       highlight: !(scope && VIEWER_BOOTSTRAP?.area_scope_index && supportsSharedComparison(scope))
@@ -3833,11 +3835,17 @@ function schoolRuleScopeLabel(rules) {
 }
 
 function schoolRuleListHtml(rules) {
-  return `<ul class="school-rule-list" aria-label="Строки действующего документа">${rules.map(item => {
+  const seen = new Set();
+  const items = [];
+  for (const item of rules) {
     const text = /^(вся территория|все жилые дома)(?:\s|$)/iu.test(item.source_house_rule || "")
       ? item.source_house_rule : item.raw_address_text || assignmentAddressTitle(item);
-    return `<li>${escapeHtml(text)}</li>`;
-  }).join("")}</ul>`;
+    const key = `${text}::${item.source_house_rule || ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    items.push(`<li>${escapeHtml(text)}</li>`);
+  }
+  return `<ul class="school-rule-list" aria-label="Строки действующего документа">${items.join("")}</ul>`;
 }
 
 function schoolFilteredCurrentAssignments(row) {
@@ -4940,7 +4948,7 @@ function renderSharedComparisonCard(context) {
   const otherAddresses = context.scopeMode === 'unassigned';
   const label=otherAddresses ? 'Другие адреса этих школ'
     : exclusive ? 'Выбранный участок' : context.kind==='building_surface' ? 'Общий дом'
-    : context.scopeMode==='all' ? 'Все общие участки этих школ' : 'Выбранный общий участок';
+    : context.scopeMode==='all' ? 'Все общие участки этих школ' : 'Пересечение расчётных областей';
   const header = `<h2 id="selectionHeading" class="scope-title" tabindex="-1">${label}</h2>`;
   const schoolNames=context.schoolKeys.map(key=>state.schoolByKey.has(key)?compactSchoolTitle(state.schoolByKey.get(key)):key.split('::')[1]).join(', ');
   const title=`<p class="scope-schools">${escapeHtml(schoolNames)}</p>`;
@@ -4957,8 +4965,8 @@ function renderSharedComparisonCard(context) {
     ${exclusive || comparisonSchoolKey ? `<button type="button" data-full-school="${escapeAttr(exclusive ? context.schoolKeys[0] : comparisonSchoolKey)}">Вся территория школы →</button>` : ''}
     ${!exclusive && context.componentCount>1 ? `<button type="button" data-scope-mode="${context.scopeMode==='all'?'component':'all'}">${context.scopeMode==='all'?'Выбранная часть':'Все общие участки ('+context.componentCount+')'}</button>` : ''}
     ${context.unassignedCount ? `<button type="button" data-scope-mode="unassigned">Другие адреса этих школ (${context.unassignedCount})</button>` : ''}</div>`;
-  return `${header}${title}<p class="scope-caption">В таблице адреса выбранной области. На карте видны ${comparisonSchoolKey ? 'участки выбранной школы' : 'все участки указанных школ'}.</p>
-    <p class="scope-count">${model.addresses.size} ${ruPlural(model.addresses.size,'адрес','адреса','адресов')}${model.schools.length>context.schoolKeys.length ? ' · В таблице также есть другие школы этих домов' : ''}</p>${controls}<div data-street-directory data-shared-comparison></div>`;
+  return `${header}${title}<p class="scope-caption">Это пересечение расчётных (не официальных) областей нескольких школ. Счётчик школ и строк в таблице описывает всю зону; галочка в строке дома показывает его фактическое закрепление.</p>
+    <p class="scope-count">${model.addresses.size} ${ruPlural(model.addresses.size,'адрес','адреса','адресов')} в зоне${model.schools.length>context.schoolKeys.length ? ' · В таблице также есть другие школы этих домов' : ''}</p>${controls}<div data-street-directory data-shared-comparison></div>`;
 }
 
 function sharedComparisonStatusHtml() {
@@ -5094,6 +5102,12 @@ function renderSchoolCard(row) {
     : allMapped ? "Для всех текущих адресов есть координаты" : "В текущем наборе нет адресов закрепления";
   const number = normalizeSchoolNumber(row.school_number);
   const buildingAddresses = schoolBuildingAddresses(row);
+  const mapPointWithoutBuildingAddress = !buildingAddresses.length && schoolMapFeatures(row).length > 0;
+  const buildingAddressLine = buildingAddresses.length
+    ? buildingAddresses.map(address => `<span title="${escapeAttr(address)}">${escapeHtml(atlasCampusAddress(address))}</span>`).join('')
+    : mapPointWithoutBuildingAddress
+      ? 'Адрес здания в данных не указан; на карте показана известная точка школы'
+      : 'Адрес школы не указан';
   return `
     ${state.returnAddressId ? `<button class="origin-back" type="button" data-return-address-id="${escapeAttr(state.returnAddressId)}">← Назад к дому: ${escapeHtml(state.returnAddressLabel || "выбранный адрес")}</button>` : ""}
     ${currentSharedAreaContext() ? `<section class="shared-school-comparison" aria-label="Сравнение школ общей территории"><div><span>Общая территория</span><button type="button" data-shared-area-key="${escapeAttr(currentSharedAreaContext().key)}">Вся область</button></div>${sharedAreaSchoolChoicesHtml(currentSharedAreaContext())}</section>` : ''}
@@ -5102,14 +5116,17 @@ function renderSchoolCard(row) {
       <div>
         <div class="card-kicker">${escapeHtml(row.district ? `${row.district} район` : '')}</div>
         ${schoolHeadingHtml(row, number)}
-        <p class="school-building-address">${buildingAddresses.length ? buildingAddresses.map(address => `<span title="${escapeAttr(address)}">${escapeHtml(atlasCampusAddress(address))}</span>`).join('') : 'Адрес школы не указан'}</p>
+        <p class="school-building-address">${buildingAddressLine}</p>
       </div>
     </div>
     ${schoolCardActionsHtml(row, currentEvidence[0], Boolean(current.length || historyStats.historical))}
     ${rulesOnly ? schoolStatusNoteHtml(schoolRuleScopeLabel(rules)) : `<div class="atlas-facts"><span>${listing?.houseCount ?? current.length} ${ruPlural(listing?.houseCount ?? current.length, 'дом', 'дома', 'домов')}${listing?.gardenCount ? ` · ${listing.gardenCount} СНТ` : ''}</span><span data-street-count></span></div>`}
     ${trustWarning ? schoolStatusNoteHtml(trustTitle) : ''}
     ${!currentEvidence.length ? schoolStatusNoteHtml(historyStats.historical ? 'Есть только исторический документ закрепления.' : 'Текущий документ закрепления не найден.') : ''}
-    ${schoolLocalityTerritories(row).map(feature => `<div class="candidate-list"><button type="button" data-garden-id="${escapeAttr(feature.properties.territory_id)}"><strong>${escapeHtml(feature.properties.name)}</strong><span>Территория целиком · показать границу</span></button></div>`).join('')}
+    ${schoolLocalityTerritories(row).map(feature => {
+      const label = feature.properties.status === 'source_only_unlocated' ? 'Территория целиком · граница не определена' : 'Территория целиком · показать границу';
+      return `<div class="candidate-list"><button type="button" data-garden-id="${escapeAttr(feature.properties.territory_id)}"><strong>${escapeHtml(feature.properties.name)}</strong><span>${escapeHtml(label)}</span></button></div>`;
+    }).join('')}
     ${rulesOnly ? schoolRuleListHtml(rules) : ''}
     ${!rulesOnly || hasGardenRows ? '<div data-street-directory></div>' : ''}
     ${!current.length ? '<div data-inline-documents="school" aria-label="Документы школы"></div>' : ''}
@@ -5234,6 +5251,7 @@ function renderGardenCard(feature) {
     : locality ? '' : areaScopeErrors.has(props.district) ? `<p class="scope-caption" role="status">Исключения СНТ не удалось проверить. <button type="button" data-retry-area-index="${escapeAttr(props.district)}">Повторить</button></p>`
       : '<p class="scope-caption">Исключения СНТ проверяются…</p>';
   return `<div class="result-eyebrow">${locality ? "Территория населённого пункта" : "Территория СНТ"}</div>
+    <p class="card-kicker">${escapeHtml(props.district ? `${props.district} район` : "Район не указан")}</p>
     <h2 id="selectionHeading" class="card-title prominent" tabindex="-1">${escapeHtml(gardenSearchLabel(feature))}</h2>
     <p class="card-subtitle">По правилу официального документа эта территория относится к следующим школам:</p>
     <div class="candidate-list">${schoolButtons}</div>${exceptionHtml}
@@ -5457,12 +5475,43 @@ function focusAreaSchoolCoverage(context) {
   if (!context || !state.map?.fitBounds) return;
   const features = [...selectedSectionFeatures(), ...selectedSchoolsForArea().flatMap(schoolLocalityTerritories)];
   if (context.geometry) features.push({geometry: context.geometry});
-  if (features.length) fitFeatures(features, { duration: 350 });
+  if (features.length) fitFeatures(features, { duration: 350, maxZoom: 13.5 });
 }
 
 function focusAddress(row) {
-  const schoolFeatures = selectedSchoolsForAddress(row).flatMap(schoolMapFeatures);
-  if (schoolFeatures.length) fitFeatures(schoolFeatures, { maxZoom: 16 });
+  const features = [];
+  if (hasMapCoordinates(row)) features.push(addressFeature(row));
+  for (const school of selectedSchoolsForAddress(row)) {
+    features.push(...schoolMapFeatures(school));
+    const section = schoolAreaFeature(school);
+    if (section) features.push(section);
+  }
+  if (features.length) fitFeatures(features, { maxZoom: 16 });
+}
+
+function refitVisibleSelection() {
+  if (!state.map) return;
+  state.map.resize();
+  window.requestAnimationFrame(() => {
+    const shared = selectedSharedArea();
+    if (shared) {
+      focusAreaSchoolCoverage(shared);
+      return;
+    }
+    const address = selectedAddressRow();
+    if (address) {
+      focusAddress(address);
+      return;
+    }
+    const garden = state.gardenById.get(state.selectedGardenId);
+    if (garden) {
+      if (garden.properties.status === 'source_only_unlocated') focusDistrict(garden.properties.district, 300);
+      else if (garden.geometry) fitFeatures([garden], { maxZoom: 16, duration: 300 });
+      return;
+    }
+    const school = selectedSchoolRow();
+    if (school) focusSchool(school);
+  });
 }
 
 function focusSchool(row) {
@@ -5843,7 +5892,11 @@ function clearFilters() {
   document.getElementById("schoolSearch").value = "";
   document.body.dataset.mobileView = "result";
   document.getElementById("mobileMapToggle")?.setAttribute("aria-pressed", "false");
-  if (document.getElementById("mobileMapToggle")) document.getElementById("mobileMapToggle").textContent = "Карта";
+  const mobileMapToggle = document.getElementById("mobileMapToggle");
+  if (mobileMapToggle) {
+    mobileMapToggle.textContent = "Карта";
+    mobileMapToggle.setAttribute("aria-label", "Показывать карту");
+  }
   applySearchModeUI();
   refreshFilterOptions();
   render();
@@ -5970,7 +6023,11 @@ async function selectGardenById(territoryId, focus = true) {
   if (focus) document.getElementById("addressSearch").value = gardenSearchLabel(feature);
   refreshFilterOptions();
   render();
-  if (feature.geometry) fitFeatures([feature], { maxZoom: 16, duration: 420 });
+  if (feature.properties.status === 'source_only_unlocated') {
+    focusDistrict(feature.properties.district, 420);
+  } else if (feature.geometry) {
+    fitFeatures([feature], { maxZoom: 16, duration: 420 });
+  }
   if (focus) window.requestAnimationFrame(() => document.getElementById("selectionHeading")?.focus());
   announce(`${gardenSearchLabel(feature)}: ${feature.properties.school_numbers.length} ${ruPlural(feature.properties.school_numbers.length, "школа", "школы", "школ")}`);
   if (VIEWER_API) {
@@ -6621,6 +6678,8 @@ function wireControls() {
     document.body.dataset.mobileView = showMap ? "map" : "result";
     mobileMapToggle.setAttribute("aria-pressed", String(showMap));
     mobileMapToggle.textContent = showMap ? "Результат" : "Карта";
+    mobileMapToggle.setAttribute("aria-label", showMap ? "Показывать результат" : "Показывать карту");
+    if (showMap) window.requestAnimationFrame(() => refitVisibleSelection());
   }
   document.getElementById("districtColorLegend")?.addEventListener("click", (event) => {
     const district = event.target.closest("[data-legend-district]")?.dataset.legendDistrict;
@@ -6634,15 +6693,13 @@ function wireControls() {
   mobileMapToggle.addEventListener("click", () => {
     const showMap = document.body.dataset.mobileView !== "map";
     setMobileMapView(showMap);
-    if (showMap && state.selectedGardenId) window.requestAnimationFrame(() => {
-      const garden = state.gardenById.get(state.selectedGardenId);
-      if (garden && state.map) {
-        state.map.resize();
-        fitFeatures([garden], { maxZoom: 16, duration: 300 });
-      }
-    });
     announce(showMap ? "Карта открыта" : "Результат поиска открыт");
   });
+  const refitMobileMap = () => {
+    if (document.body.dataset.mobileView === "map") refitVisibleSelection();
+  };
+  window.addEventListener("resize", refitMobileMap);
+  window.visualViewport?.addEventListener("resize", refitMobileMap);
 
   document.getElementById("clearDistrictFilter").addEventListener("click", () => {
     const control = document.getElementById("districtFilter");
@@ -6926,7 +6983,11 @@ function setupMapLayers() {
         "case",
         sectionHighlighted, 0.86,
         sectionDimmed, 0.04,
-        0.38
+        ["interpolate", ["linear"], ["zoom"],
+          12, 0.03,
+          13.2, 0.08,
+          14.5, 0.12
+        ]
       ]
     }
   });
