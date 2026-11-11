@@ -12,9 +12,9 @@ function node(tag) {
     setAttribute(name, value) { this.attributes[name] = value; attributeWrites++; }, getAttribute(name) { return this.attributes[name] ?? null; },
     addEventListener(name, callback) { this.listeners[name] = callback; } };
 }
-let shift = 0;
+let shift = 0, zoom = 11;
 const events = {}, map = { getContainer: () => node("div"), on: (name, callback) => events[name] = callback,
-  getZoom: () => 10, project: coordinates => ({ x: coordinates[0] + shift, y: coordinates[1] }) };
+  getZoom: () => zoom, project: coordinates => ({ x: coordinates[0] + shift, y: coordinates[1] }) };
 const context = { console, URL, setTimeout, clearTimeout, requestAnimationFrame: () => 0, cancelAnimationFrame() {},
   window: {}, document: { documentElement: { dataset: {} }, createElement: node, getElementById: () => ({ value: "" }) }, __map: map };
 vm.createContext(context);
@@ -40,6 +40,7 @@ for (let i = 0; i < 20; i++) {
 }
 assert.equal(created, 600, "revisiting the same schools must not allocate new button trees every pan");
 shift = 2000; badges.render(); shift = 0;
+zoom = 10;
 badges.update(features(1000, 600), new Set(["А::1000"])); badges.render();
 assert.equal(created, 600, "offscreen buttons must be reusable by different school identities");
 const button = badges.buttons.get("А::1000");
@@ -57,6 +58,7 @@ const changed = badges.features.find(feature => feature.properties.school_key ==
 changed.properties.school_number = "new-number";
 changed.properties.canonical_school_name = "Новое название";
 run("state.selectedSchoolKey = ''");
+zoom = 11;
 badges.active = new Set(); badges.render();
 assert(badges.buttons.has("А::1001"), "clearing selection restores other badges");
 assert.equal(button.firstElementChild.textContent, "new-number");

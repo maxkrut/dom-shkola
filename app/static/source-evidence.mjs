@@ -30,7 +30,8 @@ export function bindInlineSourceFragment(host, label) {
       viewport.scrollLeft = 0;
       viewport.scrollTop = 0;
     } else {
-      requestAnimationFrame(() => {
+      const schedule = globalThis.requestAnimationFrame ?? ((fn) => setTimeout(fn, 0));
+      schedule(() => {
         const mark = viewport.querySelector(".address-mark, .evidence-mark");
         const target = mark || viewport.querySelector("svg");
         if (!target) return;
