@@ -1,9 +1,15 @@
 # Changelog
 
-## Unreleased
+## 1.0.3 - 2026-11-19
 
-- Обновлена библиотека карты MapLibre GL JS с 6.0.0 до 6.4.1. Обновление исправляет уязвимость в обработке HTML. [GHSA-jrc7-96c5-q579](https://github.com/advisories/GHSA-jrc7-96c5-q579)
-- Updated MapLibre GL JS from 6.0.0 to 6.4.1 to fix an HTML sanitization vulnerability.
+**Безопасность.** Карта использует MapLibre GL JS 6.4.1 вместо 6.0.0. Эта версия исправляет уязвимость межсайтового скриптинга (XSS) при обработке HTML. [GHSA-jrc7-96c5-q579](https://github.com/advisories/GHSA-jrc7-96c5-q579)
+
+<details>
+<summary>English</summary>
+
+**Security.** The map now uses MapLibre GL JS 6.4.1, upgraded from 6.0.0. This fixes a cross-site scripting (XSS) vulnerability in HTML sanitization. [GHSA-jrc7-96c5-q579](https://github.com/advisories/GHSA-jrc7-96c5-q579)
+
+</details>
 
 ## 1.0.2 - 2026-11-19
 
