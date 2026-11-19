@@ -3999,11 +3999,18 @@ function areaExclusionReasonLabels(value) {
 
 function schoolAreaMethodLabel(props) {
   const labels = {
+    review_only: "по приблизительным координатам",
     road_blocks: "по объединённым дорожным кварталам OSM",
     address_voronoi: "по адресному Voronoi",
     assignment_hull: "по оболочке адресов"
   };
   return labels[props?.section_method] || props?.section_method || "";
+}
+
+function reviewContourNotice(props) {
+  return props?.area_confirmed === "no" && props.area_method === "review_point_buffer"
+    ? "Контур построен вокруг приблизительных точек адресов. Закрепление дома проверяйте по документу."
+    : "";
 }
 
 function schoolAreaSummaryHtml(row) {
@@ -4025,6 +4032,7 @@ function schoolAreaSummaryHtml(row) {
   }
   const area = formatAreaM2(props.area_m2);
   const method = schoolAreaMethodLabel(props);
+  const approximateContour = reviewContourNotice(props);
   const seedCount = Number(props.area_seed_address_count || 0);
   const totalCount = Number(props.address_count || props.geocoded_address_count || 0);
   const excludedCount = Number(props.area_excluded_address_count || 0);
@@ -4035,12 +4043,12 @@ function schoolAreaSummaryHtml(row) {
     ? `из ${totalCount} ${totalCount === 1 ? "текущего адреса" : "текущих адресов"}`
     : "";
   const excludedReasons = areaExclusionReasonLabels(props.area_exclusion_reasons || "");
-  const excludedLine = excludedCount
+  const excludedLine = excludedCount && !approximateContour
     ? `<br><span class="muted">${excludedCount} ${ruPlural(excludedCount, "адрес", "адреса", "адресов")} с отметками проверки не влияют на границу${excludedReasons.length ? `: ${escapeHtml(excludedReasons.join(", "))}` : ""}</span>`
     : "";
   return [
     area ? escapeHtml(area) : "",
-    method ? `<span class="muted">${escapeHtml(method)}</span>` : "",
+    approximateContour || method ? `<span class="muted">${escapeHtml(approximateContour || method)}</span>` : "",
     escapeHtml([seedLine, totalLine].filter(Boolean).join(" ")),
     excludedLine,
     sharedLine
@@ -5080,7 +5088,8 @@ function renderSchoolCard(row) {
   const historyStats = schoolHistoryStats(row);
   const checkStats = schoolCheckStats(row);
   const areaProps = schoolAreaFeature(row)?.properties || {};
-  const areaExcluded = Number(areaProps.area_excluded_address_count || 0);
+  const contourNotice = reviewContourNotice(areaProps);
+  const areaExcluded = contourNotice ? 0 : Number(areaProps.area_excluded_address_count || 0);
   const commonAreaAddresses = areaExcluded > 0
     && String(areaProps.area_exclusion_reasons || "").trim() === "current_multi_school"
     && schoolSharedAreaFeatures(row).length > 0;
@@ -5122,6 +5131,7 @@ function renderSchoolCard(row) {
     ${schoolCardActionsHtml(row, currentEvidence[0], Boolean(current.length || historyStats.historical))}
     ${rulesOnly ? schoolStatusNoteHtml(schoolRuleScopeLabel(rules)) : `<div class="atlas-facts"><span>${listing?.houseCount ?? current.length} ${ruPlural(listing?.houseCount ?? current.length, 'дом', 'дома', 'домов')}${listing?.gardenCount ? ` · ${listing.gardenCount} СНТ` : ''}</span><span data-street-count></span></div>`}
     ${trustWarning ? schoolStatusNoteHtml(trustTitle) : ''}
+    ${contourNotice ? schoolStatusNoteHtml(contourNotice) : ''}
     ${!currentEvidence.length ? schoolStatusNoteHtml(historyStats.historical ? 'Есть только исторический документ закрепления.' : 'Текущий документ закрепления не найден.') : ''}
     ${schoolLocalityTerritories(row).map(feature => {
       const label = feature.properties.status === 'source_only_unlocated' ? 'Территория целиком · граница не определена' : 'Территория целиком · показать границу';
@@ -5160,6 +5170,7 @@ function schoolCardActionsHtml(row, source, hasHistory) {
 }
 
 function renderSharedDirectorySchoolCard(row, directory) {
+  const contourNotice = reviewContourNotice(schoolAreaFeature(row)?.properties);
   const number = normalizeSchoolNumber(row.school_number);
   return `<div class="school-identity">
       ${/^\d+$/.test(number) ? `<span class="school-number" aria-hidden="true"><span>№</span>${escapeHtml(number)}</span>` : ''}
@@ -5170,6 +5181,7 @@ function renderSharedDirectorySchoolCard(row, directory) {
     ${schoolCardActionsHtml(row, schoolCurrentEvidence(row)[0], Boolean(directory.houseCount || Number(row.historical_address_count)))}
     <div class="atlas-facts"><span>${directory.houseCount} ${ruPlural(directory.houseCount,'дом','дома','домов')}${directory.gardenCount ? ` · ${directory.gardenCount} СНТ` : ''}</span><span data-street-count></span></div>
     ${directory.missingCoordinates ? schoolStatusNoteHtml(`Без точки дома на карте: ${directory.missingCoordinates} ${ruPlural(directory.missingCoordinates,'адрес','адреса','адресов')}`) : ''}
+    ${contourNotice ? schoolStatusNoteHtml(contourNotice) : ''}
     <div data-street-directory></div>`;
 }
 
@@ -6904,6 +6916,8 @@ function setupMapLayers() {
     ["boolean", ["feature-state", "highlighted"], false]
   ];
   const sectionDimmed = ["boolean", ["feature-state", "dimmed"], false];
+  const reviewBuffer = ["all", ["==", ["get", "area_confirmed"], "no"],
+    ["==", ["get", "area_method"], "review_point_buffer"]];
 
   state.map.addLayer({
     id: layerIds.districtFill,
@@ -6947,11 +6961,16 @@ function setupMapLayers() {
     type: "fill",
     source: "schoolSections",
     paint: {
-      "fill-color": ["case", sectionHighlighted, "#2858f5", districtAreaColor],
+      "fill-color": ["case",
+        sectionHighlighted, "#2858f5",
+        reviewBuffer, "#7c3aed",
+        districtAreaColor
+      ],
       "fill-opacity": [
         "case",
         sectionHighlighted, 0.56,
         sectionDimmed, 0.14,
+        reviewBuffer, 0.34,
         0.20
       ]
     }
@@ -7018,7 +7037,11 @@ function setupMapLayers() {
       "line-join": "round"
     },
     paint: {
-      "line-color": ["case", sectionHighlighted, "#2858f5", districtAreaColor],
+      "line-color": ["case",
+        sectionHighlighted, "#2858f5",
+        reviewBuffer, "#6d28d9",
+        districtAreaColor
+      ],
       "line-width": ["interpolate", ["linear"], ["zoom"],
         9, ["case", sectionHighlighted, 2.2, sectionDimmed, 0.35, 0.55],
         15, ["case", sectionHighlighted, 3.8, sectionDimmed, 0.65, 1.15]

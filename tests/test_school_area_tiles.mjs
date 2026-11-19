@@ -63,6 +63,20 @@ function harness(input = metadata) {
   return { runtime, sources, layers, states, filters, visibility, paints };
 }
 
+test('a review buffer keeps its warning colour until highlighted', () => {
+  const data = structuredClone(metadata);
+  Object.assign(data.features[0].properties, { area_confirmed: 'no', area_method: 'review_point_buffer' });
+  const h = harness(data);
+  assert.deepEqual(h.states, [{
+    target: { source: 'schoolAreaTiles', sourceLayer: 'areas', id: 'А::1' }, value: { unconfirmed: true }
+  }]);
+  const fill = h.layers.get(ids.schoolSectionsFill).paint['fill-color'];
+  assert.deepEqual(fill.slice(1, 5), [
+    ['boolean', ['feature-state', 'highlighted'], false], '#2858f5',
+    ['boolean', ['feature-state', 'unconfirmed'], false], '#7c3aed'
+  ]);
+});
+
 test('reviewed school outlines replace internal selected seams and do not rewrite fill geometry or repeat data on the same selection',()=>{
   const h=harness();
   const line={type:'Feature',properties:{},geometry:{type:'MultiLineString',coordinates:[[[30,59],[31,60]]]}};

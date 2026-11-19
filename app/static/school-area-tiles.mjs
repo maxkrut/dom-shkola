@@ -256,21 +256,22 @@ export class SchoolAreaTiles {
     const map = this.map, ids = this.layerIds;
     map.addSource(this.sourceId, this.source);
     const active = ["boolean", ["feature-state", "highlighted"], false];
+    const unconfirmed = ["boolean", ["feature-state", "unconfirmed"], false];
     const outlineHidden = ["boolean", ["feature-state", "outline_hidden"], false];
     const exclusive = ["==", ["get", "kind"], "exclusive"];
     const common = ["==", ["get", "kind"], "shared"];
     const districtColor = areaColorExpression(this.colorPlan, "#00C084");
     this.layers = [
       { id: ids.schoolSectionsFill, type: "fill", filter: exclusive, paint: {
-        "fill-color": ["case", active, "#2858f5", districtColor],
-        "fill-opacity": ["case", active, 0.68, 0.38]
+        "fill-color": ["case", active, "#2858f5", unconfirmed, "#7c3aed", districtColor],
+        "fill-opacity": ["case", active, 0.68, unconfirmed, 0.34, 0.38]
       } },
       { id: ids.sharedSchoolSectionsFill, type: "fill", filter: common, paint: {
         "fill-color": ["case", active, "#2858f5", "#16a6b6"], "fill-opacity": ["case", active, 0.68, 0.25]
       } },
       { id: ids.schoolSectionsLine, type: "line", filter: exclusive,
         layout: { "line-cap": "round", "line-join": "round" }, paint: {
-          "line-color": ["case", active, "#2858f5", districtColor],
+        "line-color": ["case", active, "#2858f5", unconfirmed, "#6d28d9", districtColor],
         "line-width": ["interpolate", ["linear"], ["zoom"], 9, ["case", active, 2.2, 0.55], 15, ["case", active, 3.8, 1.15]],
         "line-opacity": ["case", outlineHidden, 0, active, 1, 0.8]
         } },
@@ -282,6 +283,19 @@ export class SchoolAreaTiles {
       } }
     ];
     for (const layer of this.layers) map.addLayer({ ...layer, source: this.sourceId, "source-layer": this.sourceLayer });
+    this.markUnconfirmedContours();
+  }
+
+  markUnconfirmedContours() {
+    for (const feature of this.features) {
+      const props = feature.properties || {};
+      if (props.area_confirmed === "no" && props.area_method === "review_point_buffer") {
+        this.map.setFeatureState(
+          { source: this.sourceId, sourceLayer: this.sourceLayer, id: feature.fid },
+          { unconfirmed: true }
+        );
+      }
+    }
   }
 
   updateVisibility(district = "", visible = true) {
