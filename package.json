@@ -13,7 +13,7 @@
     "test:static-pages": "node --test scripts/test_document_page_pool.mjs scripts/test_document_pages.mjs scripts/test_static_source_evidence.mjs"
   },
   "dependencies": {
-    "maplibre-gl": "6.0.0"
+    "maplibre-gl": "6.4.1"
   },
   "devDependencies": {
     "playwright": "1.63.0"

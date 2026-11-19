@@ -676,7 +676,7 @@ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 THIS SOFTWARE.
 
 ========================================================================
-maplibre-gl@6.0.0 - BSD-3-Clause
+maplibre-gl@6.4.1 - BSD-3-Clause
 Copyright (c) 2023, MapLibre contributors
 
 All rights reserved.
